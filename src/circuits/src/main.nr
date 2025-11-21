@@ -1,78 +1,39 @@
-// Function to sort values in ascending order
-fn sort3(a: u64, b: u64, c: u64) -> [u64; 3] {
-    let mut x = a;
-    let mut y = b;
-    let mut z = c;
-
-    if x > y {
-        let tmp = x;
-        x = y;
-        y = tmp;
-    }
-
-    if y > z {
-        let tmp = y;
-        y = z;
-        z = tmp;
-    }
-
-    if x > y {
-        let tmp = x;
-        x = y;
-        y = tmp;
-    }
-
-    [x, y, z]
-}
-
-// Two prices are aligned if they are within 7% (hardcoded) of each other.
-fn are_close(p: u64, q: u64) -> bool {
-    assert(p > 0);
-    assert(q > 0);
-
-    let diff = if p > q { p - q } else { q - p };
-    let max  = if p > q { p } else { q };
-
-    diff * 7 <= max
-}
-
 // Main circuit:
-//  - p1, p2, p3: private feeds
+//  - p1: private feed with 2 decimal places (e.g., 30000 represents 300.00)
+//  - p2: private feed with 4 decimal places (e.g., 3000000 represents 300.0000)
 //  - asset_id: public (binds proof to an asset, e.g. TSLA)
-// Returns: public (final_price, asset_id)
+// Returns: public (final_price with 2 decimals, asset_id)
+// Throws an error if one price is more than 7% over the other
 fn main(
     p1: u64,
     p2: u64,
-    p3: u64,
     asset_id: pub str<4>,
 ) -> pub (u64, str<4>) {
     assert(p1 > 0);
     assert(p2 > 0);
-    assert(p3 > 0);
 
-    let c12 = are_close(p1, p2);
-    let c13 = are_close(p1, p3);
-    let c23 = are_close(p2, p3);
+    // Normalize both prices to 2 decimal places
+    // p1 already has 2 decimals, keep as is
+    // p2 has 4 decimals, divide by 100 to get 2 decimals
+    let p1_normalized = p1;
+    let p2_normalized = p2 / 100;
 
-    let final_price = if c12 & c13 & c23 {
-        // Case 1: all three feeds agree (no outlier)
-        let sorted = sort3(p1, p2, p3);
-        sorted[1]
-    } else if c12 & !c13 & !c23 {
-        // Case 2: (p1, p2) aligned, p3 outlier
-        (p1 + p2) / 2
-    } else if c13 & !c12 & !c23 {
-        // Case 3: (p1, p3) aligned, p2 outlier
-        (p1 + p3) / 2
-    } else if c23 & !c12 & !c13 {
-        // Case 4: (p2, p3) aligned, p1 outlier
-        (p2 + p3) / 2
-    } else {
-        // Anything else (e.g. weird inconsistent pattern) -> reject
-        // Circuit fails -> no valid proof for this set of feeds.
-        assert(false);
-        0
+    let diff = if p1_normalized > p2_normalized { 
+        p1_normalized - p2_normalized 
+    } else { 
+        p2_normalized - p1_normalized 
     };
+    let max = if p1_normalized > p2_normalized { 
+        p1_normalized 
+    } else { 
+        p2_normalized 
+    };
+
+    // Ensure prices are within 7% of each other, otherwise fail
+    assert(diff * 100 <= max * 7);
+
+    // Average the two normalized prices (both now have 2 decimal places)
+    let final_price = (p1_normalized + p2_normalized) / 2;
 
     (final_price, asset_id)
 }
@@ -81,55 +42,31 @@ fn main(
 fn test_main() {
     let asset_id: str<4> = "TSLA";
     
-    // Test Case 1: All three feeds agree (within 7%)
-    let (price, id) = main(100, 105, 102, asset_id);
-    assert(price == 102); // median of [100, 102, 105]
+    // Test Case 1: p1=300.00 (30000), p2=300.01 (3000100)
+    // p2_normalized = 3000100 / 100 = 30001
+    // average = (30000 + 30001) / 2 = 30000 (represents 300.00)
+    let (price, id) = main(30000, 3000100, asset_id);
+    assert(price == 30000);
     assert(id == asset_id);
     
-    // Test Case 2: p1 and p2 aligned, p3 is outlier
-    let (price2, id2) = main(100, 105, 200, asset_id);
-    assert(price2 == 102); // (100 + 105) / 2 = 102
+    // Test Case 2: p1=100.50 (10050), p2=100.75 (1007500)
+    // p2_normalized = 1007500 / 100 = 10075
+    // average = (10050 + 10075) / 2 = 10062 (represents 100.62)
+    let (price2, id2) = main(10050, 1007500, asset_id);
+    assert(price2 == 10062);
     assert(id2 == asset_id);
     
-    // Test Case 3: p1 and p3 aligned, p2 is outlier
-    let (price3, id3) = main(100, 200, 105, asset_id);
-    assert(price3 == 102); // (100 + 105) / 2 = 102
+    // Test Case 3: Equal prices p1=200.00 (20000), p2=200.00 (2000000)
+    let (price3, id3) = main(20000, 2000000, asset_id);
+    assert(price3 == 20000); // Represents 200.00
     assert(id3 == asset_id);
     
-    // Test Case 4: p2 and p3 aligned, p1 is outlier
-    let (price4, id4) = main(200, 100, 105, asset_id);
-    assert(price4 == 102); // (100 + 105) / 2 = 102
-    assert(id4 == asset_id);
-    
-    // Test with 3-character ticker (padded to 4)
-    let asset_id_3: str<4> = "BTC ";
-    let (price5, id5) = main(50000, 50100, 50050, asset_id_3);
-    assert(price5 == 50050);
-    assert(id5 == asset_id_3);
-}
-
-#[test]
-fn test_are_close() {
-    // Within threshold: diff * 7 <= max
-    assert(are_close(100, 107));
-    assert(are_close(107, 100));
-    assert(are_close(100, 100));
-    assert(are_close(100, 114)); // 14 * 7 = 98 <= 114
-    
-    // Outside threshold
-    assert(!are_close(100, 118)); // 18 * 7 = 126 > 118
-    assert(!are_close(100, 200)); // 100 * 7 = 700 > 200
-}
-
-#[test]
-fn test_sort3() {
-    let sorted = sort3(3, 1, 2);
-    assert(sorted[0] == 1);
-    assert(sorted[1] == 2);
-    assert(sorted[2] == 3);
-    
-    let sorted2 = sort3(10, 20, 5);
-    assert(sorted2[0] == 5);
-    assert(sorted2[1] == 10);
-    assert(sorted2[2] == 20);
+    // Test with different asset
+    let asset_id_btc: str<4> = "BTC ";
+    // p1=50000.00 (5000000), p2=50100.00 (501000000)
+    // p2_normalized = 501000000 / 100 = 5010000
+    // average = (5000000 + 5010000) / 2 = 5005000 (represents 50050.00)
+    let (price4, id4) = main(5000000, 501000000, asset_id_btc);
+    assert(price4 == 5005000);
+    assert(id4 == asset_id_btc);
 }

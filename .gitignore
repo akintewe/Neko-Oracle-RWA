@@ -6,3 +6,5 @@ target
 src/circuits/Prover.toml
 src/circuits/Verifier.toml
 src/circuits/circuit.json
+
+/dist
