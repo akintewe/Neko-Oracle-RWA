@@ -4,7 +4,7 @@ A simplified fungible token contract for Real-World Assets (RWAs) with RWA Oracl
 
 ## Overview
 
-This contract implements a standard fungible token (mint, burn, transfer, balance, approve, allowance) with integration to the RWA Oracle for reading asset prices. It does **not** include CDPs, Stability Pools, or lending logic - those features are implemented in a separate lending contract.
+This contract implements a standard fungible token (mint, burn, transfer, balance, approve, allowance) with integration to the RWA Oracle for reading asset prices.
 
 ## Features
 
@@ -21,7 +21,7 @@ pub fn __constructor(
     env: &Env,
     admin: Address,              // Admin address with mint/burn permissions
     asset_contract: Address,     // RWA Oracle contract ID for price feed
-    pegged_asset: Symbol,        // Symbol of the RWA asset in the oracle (e.g., "NVDA", "TSLA")
+    pegged_asset: Symbol,        // Symbol of the RWA asset in the oracle ("NVDA", "TSLA" etc.)
     name: String,                // Full name of the token
     symbol: String,              // Token symbol
     decimals: u32,               // Number of decimal places
@@ -55,7 +55,7 @@ pub fn __constructor(
 
 The contract stores:
 - `asset_contract`: Address of the RWA Oracle contract
-- `pegged_asset`: Symbol of the RWA asset in the oracle (e.g., "NVDA")
+- `pegged_asset`: Symbol of the RWA asset in the oracle ("NVDA", "TSLA" etc.)
 
 When `get_price()` is called, the contract:
 1. Queries the RWA Oracle contract
@@ -70,16 +70,6 @@ When `get_price()` is called, the contract:
 - `burnrwa`: Emitted when tokens are burned
   - Topic: `("burnrwa", from)`
   - Data: `amount`
-
-## Architecture Notes
-
-This contract is intentionally simplified:
-- ❌ No CDPs (Collateralized Debt Positions)
-- ❌ No Stability Pool
-- ❌ No lending/borrowing logic
-- ❌ No interest calculations
-
-All lending/borrowing functionality is implemented in a separate `rwa-lending` contract that uses these RWA tokens as collateral.
 
 ## Usage Example
 
