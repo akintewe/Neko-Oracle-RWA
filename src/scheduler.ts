@@ -142,14 +142,21 @@ export class OracleScheduler {
         }
       }
     } catch (error) {
-      this.log(
-        "error",
-        `Price update failed: ${
-          error instanceof Error ? error.message : String(error)
-        }`
-      );
-      if (this.logLevel === "debug" && error instanceof Error) {
-        console.error(error.stack);
+      const errorMessage =
+        error instanceof Error
+          ? error.message
+          : typeof error === "object" && error !== null
+          ? JSON.stringify(error, null, 2)
+          : String(error);
+
+      this.log("error", `Price update failed: ${errorMessage}`);
+
+      if (error instanceof Error) {
+        if (this.logLevel === "debug") {
+          console.error(error.stack);
+        }
+      } else {
+        console.error("Error details:", error);
       }
       throw error;
     }
