@@ -6,3 +6,6 @@ export interface NormalizedStockPrice {
     timestamp: number; 
 }
 // Shared utilities and types will be exported here
+
+// Type exports
+export * from './types';
