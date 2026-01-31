@@ -285,6 +285,15 @@ Confidence score (0-100) is calculated based on:
 - 5 sources, 1% spread, low deviation → ~90% confidence
 - 3 sources, 10% spread, high deviation → ~30% confidence
 
+## Features
+
+### Data Reception Layer
+Implemented via `DataReceptionService`, this layer connects to Ingestor services to receive real-time and historical data.
+- **WebSocket Client**: Real-time price streaming with exponential backoff reconnection.
+- **HTTP Fallback**: Retrieval of historical data and latest price snapshots.
+- **Event-Driven**: Emits `price.received` events using `EventEmitter2`.
+- **Validation**: Schema-based validation using `class-validator`.
+
 ## Getting Started
 
 ### Prerequisites
