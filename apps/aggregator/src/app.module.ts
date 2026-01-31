@@ -10,8 +10,8 @@ import { MedianAggregator } from './strategies/aggregators/median.aggregator';
 import { TrimmedMeanAggregator } from './strategies/aggregators/trimmed-mean.aggregator';
 
 @Module({
-  imports: [NormalizationModule],
   imports: [
+    NormalizationModule,
     ConfigModule.forRoot({
       isGlobal: true,
     }),
