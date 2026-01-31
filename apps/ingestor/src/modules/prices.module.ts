@@ -9,8 +9,9 @@ import { FinnhubAdapter } from '../providers/finnhub.adapter';
   providers: [
     PriceFetcherService, 
     StockService,        
-    FinnhubAdapter       
+    FinnhubAdapter,
+    SchedulerService
   ],
-  exports: [PriceFetcherService, StockService], 
+  exports: [PriceFetcherService, StockService, SchedulerService], 
 })
 export class PricesModule {}
