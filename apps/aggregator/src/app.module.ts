@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { NormalizationModule } from './modules/normalization.module';
 import { ConfigModule } from '@nestjs/config';
 import { AggregationService } from './services/aggregation.service';
 import { WeightedAverageAggregator } from './strategies/aggregators/weighted-average.aggregator';
@@ -10,6 +11,7 @@ import { DebugModule } from './debug/debug.module';
 
 @Module({
   imports: [
+    NormalizationModule,
     ConfigModule.forRoot({ isGlobal: true, envFilePath: '.env' }),
     HealthModule,
     MetricsModule,
