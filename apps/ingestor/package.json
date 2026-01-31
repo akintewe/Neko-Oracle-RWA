@@ -12,6 +12,7 @@
     "lint": "eslint \"src/**/*.ts\"",
     "test": "jest",
     "test:watch": "jest --watch",
+    "dev": "nest start --watch",
     "test:cov": "jest --coverage"
   },
   "dependencies": {
@@ -22,6 +23,7 @@
     "@nestjs/platform-express": "^10.0.0",
     "@nestjs/schedule": "^4.0.0",
     "reflect-metadata": "^0.1.13",
+    "@oracle-stocks/shared": "file:../../packages/shared",
     "rxjs": "^7.8.1"
   },
   "devDependencies": {
