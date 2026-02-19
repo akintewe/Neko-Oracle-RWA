@@ -8,6 +8,7 @@ import { TrimmedMeanAggregator } from '../strategies/aggregators/trimmed-mean.ag
 import { getSourceWeight } from '../config/source-weights.config';
 import { MetricsService } from '../metrics/metrics.service';
 import { DebugService } from '../debug/debug.service';
+import { StorageService } from './storage.service';
 
 /**
  * Configuration options for the aggregation service
@@ -43,6 +44,7 @@ export class AggregationService {
   constructor(
     @Optional() private readonly metricsService?: MetricsService,
     @Optional() private readonly debugService?: DebugService,
+    @Optional() private readonly storageService?: StorageService,
   ) {
     // Initialize all aggregation strategies
     this.aggregators = new Map<string, IAggregator>();
@@ -149,6 +151,9 @@ export class AggregationService {
         method,
         symbol,
         (Date.now() - startTime) / 1000,
+      );
+      this.storageService?.storePrice(result).catch((err) =>
+        this.logger.error(`StorageService.storePrice failed: ${err.message}`),
       );
       return result;
     } catch (err) {

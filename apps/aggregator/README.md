@@ -34,7 +34,7 @@ The Aggregator service is responsible for calculating a single consensus price p
 | `/ready` | GET | Readiness probe for Kubernetes. Same checks as `/health`; returns 200 when the service can accept traffic. |
 | `/live` | GET | Liveness probe for Kubernetes. Returns 200 when the process is alive (no dependency checks). |
 | `/status` | GET | Detailed system information: uptime, memory usage, dependency check results, and version. |
-| `/metrics` | GET | Prometheus metrics in [exposition format](https://prometheus.io/docs/instrumenting/exposition_formats/). Scrape this endpoint for aggregation count, latency, errors, and default Node.js metrics. |
+| `/metrics` | GET | Prometheus metrics in [exposition format](https://prometheus.io/docs/instrumenting/exposition_formats/). Scrape this endpoint for aggregation count, latency, errors, storage cache hits/misses, and default Node.js metrics. |
 | `/debug/prices` | GET | Last aggregated and normalized prices held in memory. Useful for debugging without hitting external systems. |
 
 **Health checks**: When `REDIS_URL` or `INGESTOR_URL` are set, the health check verifies connectivity. If a configured dependency is unreachable, `/health` and `/ready` return 503. If not set, that dependency is skipped (not included in the check).
@@ -48,14 +48,21 @@ aggregator/
 │   │   ├── normalized-price.interface.ts
 │   │   ├── aggregated-price.interface.ts
 │   │   ├── aggregator.interface.ts
-│   │   └── aggregation-config.interface.ts
+│   │   ├── aggregation-config.interface.ts
+│   │   └── storage-options.interface.ts
 │   ├── strategies/
 │   │   └── aggregators/      # Aggregation strategy implementations
 │   │       ├── weighted-average.aggregator.ts
 │   │       ├── median.aggregator.ts
 │   │       └── trimmed-mean.aggregator.ts
 │   ├── services/
-│   │   └── aggregation.service.ts   # Main aggregation service
+│   │   ├── aggregation.service.ts   # Main aggregation service
+│   │   ├── data-reception.service.ts
+│   │   ├── normalization.service.ts
+│   │   └── storage.service.ts       # Redis persistence layer
+│   ├── modules/
+│   │   ├── normalization.module.ts
+│   │   └── storage.module.ts        # Redis storage module
 │   ├── health/               # Health checks (Terminus)
 │   │   ├── health.controller.ts
 │   │   └── indicators/
@@ -68,9 +75,60 @@ aggregator/
 │   │   ├── debug.controller.ts
 │   │   └── debug.service.ts
 │   ├── config/
-│   │   └── source-weights.config.ts  # Weight configuration
+│   │   ├── source-weights.config.ts  # Weight configuration
+│   │   └── redis.config.ts           # Redis config factory
 │   └── app.module.ts
 ```
+
+## Redis Storage
+
+The aggregator uses Redis to persist aggregated prices for fast access by downstream services (e.g., the API service). Redis is **optional** — when `REDIS_URL` is not set, the service runs in no-op mode and all storage operations are silently skipped.
+
+### Quick Start
+
+```bash
+# Start Redis with Docker
+docker compose up -d redis
+
+# Add to apps/aggregator/.env
+REDIS_URL=redis://localhost:6379
+```
+
+### Redis Key Schema
+
+| Key Pattern | Type | TTL | Purpose |
+|-------------|------|-----|---------|
+| `price:latest:{SYMBOL}` | STRING (JSON) | `REDIS_PRICE_TTL_SECONDS` (default 300 s) | Latest `AggregatedPrice` per symbol, expires automatically |
+| `price:history:{SYMBOL}` | SORTED SET, score = `computedAt` ms | None (bounded by max-entries trim) | Time-series history, up to `REDIS_HISTORY_MAX_ENTRIES` entries |
+| `price:symbols` | SET | None | Index of all symbols that have been stored |
+
+The prefix `price` can be overridden with `REDIS_KEY_PREFIX` for namespace isolation in shared Redis instances.
+
+### Environment Variables
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `REDIS_URL` | _(unset)_ | Redis connection URL. When absent, StorageService runs in no-op mode. |
+| `REDIS_PRICE_TTL_SECONDS` | `300` | Seconds before a `latest` price key expires. Default is 5 minutes. |
+| `REDIS_HISTORY_MAX_ENTRIES` | `100` | Maximum history entries kept per symbol. Older entries are pruned automatically on write. |
+| `REDIS_KEY_PREFIX` | `price` | Prefix for all Redis keys. Useful for separating environments. |
+
+### Graceful Degradation
+
+When `REDIS_URL` is not configured:
+- `StorageService.onModuleInit()` logs a warning and sets `client = null`.
+- All public methods (`storePrice`, `getLatestPrice`, `getPriceHistory`, `storePriceBatch`, `getLatestPriceBatch`, `getTrackedSymbols`, `deleteSymbol`) return safe empty values immediately.
+- The service logs and never throws — a Redis failure never interrupts price aggregation.
+
+### Prometheus Metrics (Storage)
+
+| Metric | Type | Description |
+|--------|------|-------------|
+| `aggregator_storage_cache_hits_total` | Counter | Total Redis read cache hits |
+| `aggregator_storage_cache_misses_total` | Counter | Total Redis read cache misses |
+| `aggregator_storage_operation_duration_seconds` | Histogram (labels: `operation`) | Duration of Redis `read`/`write` operations in seconds |
+
+These metrics are available at `GET /metrics` alongside existing aggregation metrics.
 
 ## Aggregation Methods
 
@@ -387,6 +445,7 @@ npm run test:cov
 All components have comprehensive test coverage (>85%):
 
 - ✅ `aggregation.service.spec.ts` - 50+ test cases
+- ✅ `storage.service.spec.ts` - 40+ test cases (mocked ioredis)
 - ✅ `weighted-average.aggregator.spec.ts` - 15+ test cases
 - ✅ `median.aggregator.spec.ts` - 18+ test cases
 - ✅ `trimmed-mean.aggregator.spec.ts` - 20+ test cases

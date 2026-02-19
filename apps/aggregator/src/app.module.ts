@@ -1,24 +1,26 @@
 import { Module } from '@nestjs/common';
-import { NormalizationModule } from './modules/normalization.module';
+import { HttpModule } from '@nestjs/axios';
 import { ConfigModule } from '@nestjs/config';
+import { EventEmitterModule } from '@nestjs/event-emitter';
+import { NormalizationModule } from './modules/normalization.module';
+import { StorageModule } from './modules/storage.module';
+import { HealthModule } from './health/health.module';
+import { MetricsModule } from './metrics/metrics.module';
+import { DebugModule } from './debug/debug.module';
+import { DataReceptionService } from './services/data-reception.service';
 import { AggregationService } from './services/aggregation.service';
 import { WeightedAverageAggregator } from './strategies/aggregators/weighted-average.aggregator';
 import { MedianAggregator } from './strategies/aggregators/median.aggregator';
 import { TrimmedMeanAggregator } from './strategies/aggregators/trimmed-mean.aggregator';
-import { HealthModule } from './health/health.module';
-import { MetricsModule } from './metrics/metrics.module';
-import { DebugModule } from './debug/debug.module';
 
 @Module({
   imports: [
-    NormalizationModule,
     ConfigModule.forRoot({ isGlobal: true, envFilePath: '.env' }),
+    NormalizationModule,
     HealthModule,
     MetricsModule,
     DebugModule,
-    ConfigModule.forRoot({
-      isGlobal: true,
-    }),
+    StorageModule,
     HttpModule,
     EventEmitterModule.forRoot(),
   ],
@@ -32,4 +34,4 @@ import { DebugModule } from './debug/debug.module';
   ],
   exports: [AggregationService],
 })
-export class AppModule { }
+export class AppModule {}

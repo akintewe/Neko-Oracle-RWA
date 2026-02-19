@@ -1,0 +1,27 @@
+version: '3.9'
+
+services:
+  redis:
+    image: redis:7.2-alpine
+    container_name: neko-oracle-redis
+    ports:
+      - '6379:6379'
+    volumes:
+      - redis_data:/data
+    command: >
+      redis-server
+      --save 60 1
+      --loglevel notice
+      --maxmemory 256mb
+      --maxmemory-policy allkeys-lru
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+    restart: unless-stopped
+
+volumes:
+  redis_data:
+    driver: local

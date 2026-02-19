@@ -26,6 +26,15 @@ export class MetricsService {
   /** Throughput: aggregations per symbol (optional dimension) */
   readonly aggregationsBySymbol: Counter<string>;
 
+  /** Number of cache hits on Redis price reads */
+  readonly storageCacheHits: Counter<string>;
+
+  /** Number of cache misses on Redis price reads */
+  readonly storageCacheMisses: Counter<string>;
+
+  /** Storage operation duration (read/write) in seconds */
+  readonly storageOperationDuration: Histogram<string>;
+
   constructor() {
     this.register = new Registry();
     this.aggregationCount = new Counter({
@@ -51,6 +60,23 @@ export class MetricsService {
       name: 'aggregator_aggregations_by_symbol_total',
       help: 'Total aggregations per symbol',
       labelNames: ['symbol', 'method'],
+      registers: [this.register],
+    });
+    this.storageCacheHits = new Counter({
+      name: 'aggregator_storage_cache_hits_total',
+      help: 'Total cache hits on Redis price reads',
+      registers: [this.register],
+    });
+    this.storageCacheMisses = new Counter({
+      name: 'aggregator_storage_cache_misses_total',
+      help: 'Total cache misses on Redis price reads',
+      registers: [this.register],
+    });
+    this.storageOperationDuration = new Histogram({
+      name: 'aggregator_storage_operation_duration_seconds',
+      help: 'Storage (Redis) operation duration in seconds',
+      labelNames: ['operation'],
+      buckets: [0.001, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1],
       registers: [this.register],
     });
     collectDefaultMetrics({ register: this.register, prefix: 'aggregator_' });
